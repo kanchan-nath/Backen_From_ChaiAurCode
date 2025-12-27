@@ -15,16 +15,86 @@ const getAllVideos = asyncHandler(async (req, res) => {
 const publishAVideo = asyncHandler(async (req, res) => {
     const { title, description} = req.body
     // TODO: get video, upload to cloudinary, create video
+    
+    //user - validate
+    // user upload video
+    // video uplload on clodinary and update the database
+    // same goes to thumbnail
+
+    if(!title || !description){
+        throw new ApiError(400, "All Fields are Required")
+    }
+
+    let videoFileLocalPath;
+    if(req.file && Array.isArray(req.file.videoFile) && req.file.videoFile.length > 0){
+        videoFileLocalPath = req.file.videoFile[0].path
+    }
+
+    if (!videoFileLocalPath){
+        throw new ApiError(400, "Video File is required X")
+    }
+
+    let thumbnailLocalPath;
+    if(req.file && Array.isArray(req.file.thumbnail) && req.file.thumbnail.length > 0){
+        thumbnailLocalPath = req.file.thumbnail[0].path
+    }
+
+    if(!thumbnailLocalPath){
+        throw new ApiError(400, " Thumbanil is required Y")
+    }
+
+    const video = await uploadOnCloudinary(videoFileLocalPath)
+    const thumbnail  = await uploadOnCloudinary(thumbnailLocalPath)
+
+    if(!video){
+        throw new ApiError(400, "Video file is required")
+    }
+
+    if (!thumbnail) {
+        throw new ApiError(400, "Thumbnail file is required")
+    }
+
+
+    await Video.create({
+        title,
+        description, 
+        video: video.url,
+        thumbnail: thumbnail.url
+
+        
+    })
+
+    
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: get video by id
+
+    const {title, description} = req.body
+
+    const video = await Video.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                title,
+                description,
+            }
+        }
+    )
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Changed Successfully"))
+
+
 })
 
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: update video details like title, description, thumbnail
+
+
 
 })
 
