@@ -95,15 +95,16 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
     const { playlistId, videoId } = req.params
 
-    // First, check if playlist and video exist
-    const playlist = await Playlist.findById(playlistId);
-    if (!playlist) {
-        throw new Error("Playlist not found");
-    }
-
+    // Check if video exists
     const video = await Video.findById(videoId);
     if (!video) {
         throw new Error("Video not found");
+    }
+
+    // Check if playlist exists
+    const playlist = await Playlist.findById(playlistId);
+    if (!playlist) {
+        throw new Error("Playlist not found");
     }
 
     // Check if video is already in playlist
@@ -111,21 +112,21 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
         throw new Error("Video already exists in playlist");
     }
 
-    // Add video to the playlist
+    // Add video to playlist and populate videoDetails in one operation
+    await Playlist.updateOne(
+        { _id: new mongoose.Types.ObjectId(playlistId) },
+        {
+            $addToSet: {
+                videos: new mongoose.Types.ObjectId(videoId)
+            }
+        }
+    );
+
+    // Now use aggregation to populate videoDetails and save
     await Playlist.aggregate([
         {
             $match: {
                 _id: new mongoose.Types.ObjectId(playlistId)
-            }
-        },
-        {
-            $set: {
-                videos: {
-                    $concatArrays: [
-                        "$videos",
-                        [new mongoose.Types.ObjectId(videoId)]
-                    ]
-                }
             }
         },
         {
@@ -134,17 +135,6 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
                 localField: "videos",
                 foreignField: "_id",
                 as: "videoDetails"
-            }
-        },
-        {
-            $project: {
-                name: 1,
-                description: 1,
-                videos: 1,
-                videoDetails: 1,
-                owner: 1,
-                createdAt: 1,
-                updatedAt: 1
             }
         },
         {
@@ -160,11 +150,9 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
     // Fetch the updated playlist
     const updatedPlaylist = await Playlist.findById(playlistId);
 
-    res.status(200).json({
-        success: true,
-        message: "Video added to playlist successfully",
-        data: updatedPlaylist
-    });
+    return res
+    .status(200)
+    .json(new ApiResponse(200, updatePlaylist, "Video added to playlist"));
 })
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
