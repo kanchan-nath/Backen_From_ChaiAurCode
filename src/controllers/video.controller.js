@@ -112,7 +112,7 @@ const updateVideo = asyncHandler(async (req, res) => {
         changeThumbnailLocalPath = req.files.thumbnail[0].path
     }
     const changedThumbnail = await uploadOnCloudinary(changeThumbnailLocalPath)
-    console.log(changedThumbnail)
+    // console.log(changedThumbnail)
 
     const updatedVideoDetails = await Video.findByIdAndUpdate(
         videoId,
