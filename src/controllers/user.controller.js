@@ -474,7 +474,7 @@ const getWatchHistory = asyncHandler(async(req, res) => {
             }
         }
     ])
-
+    console.log(user)
     return res
     .status(200)
     .json(
