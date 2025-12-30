@@ -3,6 +3,7 @@ import {Playlist} from "../models/playlist.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
+import {Video} from "../models/video.model.js"
 
 
 const createPlaylist = asyncHandler(async (req, res) => {
@@ -92,27 +93,78 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 })
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
-    const {playlistId, videoId} = req.params
+    const { playlistId, videoId } = req.params
 
-    const playlist = await Playlist.aggregate([
+    // First, check if playlist and video exist
+    const playlist = await Playlist.findById(playlistId);
+    if (!playlist) {
+        throw new Error("Playlist not found");
+    }
+
+    const video = await Video.findById(videoId);
+    if (!video) {
+        throw new Error("Video not found");
+    }
+
+    // Check if video is already in playlist
+    if (playlist.videos.includes(videoId)) {
+        throw new Error("Video already exists in playlist");
+    }
+
+    // Add video to the playlist
+    await Playlist.aggregate([
         {
             $match: {
                 _id: new mongoose.Types.ObjectId(playlistId)
             }
         },
         {
-            $lookup:{
+            $set: {
+                videos: {
+                    $concatArrays: [
+                        "$videos",
+                        [new mongoose.Types.ObjectId(videoId)]
+                    ]
+                }
+            }
+        },
+        {
+            $lookup: {
                 from: "videos",
                 localField: "videos",
                 foreignField: "_id",
-                as: "videos"
+                as: "videoDetails"
+            }
+        },
+        {
+            $project: {
+                name: 1,
+                description: 1,
+                videos: 1,
+                videoDetails: 1,
+                owner: 1,
+                createdAt: 1,
+                updatedAt: 1
+            }
+        },
+        {
+            $merge: {
+                into: "playlists",
+                on: "_id",
+                whenMatched: "merge",
+                whenNotMatched: "discard"
             }
         }
-    ])
-    // console.log(playlist)
-    return res
-    .status(200)
-    .json(new ApiResponse(200, playlist, "Video added to playlist"))
+    ]);
+
+    // Fetch the updated playlist
+    const updatedPlaylist = await Playlist.findById(playlistId);
+
+    res.status(200).json({
+        success: true,
+        message: "Video added to playlist successfully",
+        data: updatedPlaylist
+    });
 })
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
