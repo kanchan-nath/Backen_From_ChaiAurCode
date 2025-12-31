@@ -37,9 +37,13 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
         throw new ApiError(400, "User id is required")
     }
 
+    const playlists = await Playlist.find().populate('videos')
+    
+    // console.log(playlists)
+
     return res
     .status(200)
-    .json(new ApiResponse(200, Playlist, "Playlist Fetched Successfully"))
+    .json(new ApiResponse(200, playlists, "Playlist Fetched Successfully"))
 })
 
 const getPlaylistById = asyncHandler(async (req, res) => {
