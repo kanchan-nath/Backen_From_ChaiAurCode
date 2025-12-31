@@ -19,7 +19,6 @@ router.route("/").post(createPlaylist)
 router
     .route("/:playlistId")
     .get(getPlaylistById)
-    // .get(getVideoPlaylist)
     .patch(updatePlaylist)
     .delete(deletePlaylist);
 
