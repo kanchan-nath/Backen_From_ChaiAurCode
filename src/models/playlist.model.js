@@ -3,27 +3,30 @@ import mongoose, { Schema } from "mongoose";
 const playlistSchema = new Schema({
     name: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     description: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     videos: [
         {
-            type: Schema.Types.ObjectId,
-            ref: "Video"
-        }
-    ],
-    videoDetails: [
-        {
-            type: Schema.Types.ObjectId,
-            ref: "Video"
+            _id: { type: Schema.Types.ObjectId },
+            title: { type: String },
+            description: { type: String },
+            videoFile: { type: String },
+            thumbnail: { type: String },
+            duration: { type: Number },
+            views: { type: Number },
+            isPublished: { type: Boolean },
+            createdAt: { type: Date }
         }
     ],
     owner: {
         type: Schema.Types.ObjectId,
-        ref: "User"
+        ref: "User",
     }
 }, { timestamps: true });
 

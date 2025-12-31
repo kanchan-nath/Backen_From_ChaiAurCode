@@ -93,36 +93,24 @@ const getPlaylistById = asyncHandler(async (req, res) => {
 })
 
 const addVideoToPlaylist = asyncHandler(async (req, res) => {
-    const { playlistId, videoId } = req.params
+    const { playlistId, videoId } = req.params;
 
-    // Check if video exists
     const video = await Video.findById(videoId);
     if (!video) {
-        throw new Error("Video not found");
+        throw new ApiError(404, "Video not found");
     }
 
-    // Check if playlist exists
     const playlist = await Playlist.findById(playlistId);
     if (!playlist) {
-        throw new Error("Playlist not found");
+        throw new ApiError(404, "Playlist not found");
     }
 
-    // Check if video is already in playlist
-    if (playlist.videos.includes(videoId)) {
-        throw new Error("Video already exists in playlist");
+    const existingVideo = playlist.videoDetails.id(videoId);
+
+    if (existingVideo) {
+        throw new ApiError(400, "Video already exists in playlist");
     }
 
-    // Add video to playlist and populate videoDetails in one operation
-    await Playlist.updateOne(
-        { _id: new mongoose.Types.ObjectId(playlistId) },
-        {
-            $addToSet: {
-                videos: new mongoose.Types.ObjectId(videoId)
-            }
-        }
-    );
-
-    // Now use aggregation to populate videoDetails and save
     await Playlist.aggregate([
         {
             $match: {
@@ -130,36 +118,95 @@ const addVideoToPlaylist = asyncHandler(async (req, res) => {
             }
         },
         {
+            $addFields: {
+                tempVideoIds: {
+                    $concatArrays: [
+                        "$videos._id", 
+                        [new mongoose.Types.ObjectId(videoId)]
+                    ]
+                }
+            }
+        },
+        {
             $lookup: {
                 from: "videos",
-                localField: "videos",
+                localField: "tempVideoIds",
                 foreignField: "_id",
-                as: "videoDetails"
+                as: "allVideos"
+            }
+        },
+        {
+            $addFields: {
+                videos: {
+                    $map: {
+                        input: "$allVideos",
+                        as: "video",
+                        in: {
+                            _id: "$$video._id",
+                            title: "$$video.title",
+                            description: "$$video.description",
+                            videoFile: "$$video.videoFile",
+                            thumbnail: "$$video.thumbnail",
+                            duration: "$$video.duration",
+                            views: "$$video.views",
+                            isPublished: "$$video.isPublished",
+                            createdAt: "$$video.createdAt"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                tempVideoIds: 0,
+                allVideos: 0
             }
         },
         {
             $merge: {
                 into: "playlists",
                 on: "_id",
-                whenMatched: "merge",
+                whenMatched: "replace",
                 whenNotMatched: "discard"
             }
         }
     ]);
 
-    // Fetch the updated playlist
     const updatedPlaylist = await Playlist.findById(playlistId);
 
     return res
     .status(200)
-    .json(new ApiResponse(200, updatePlaylist, "Video added to playlist"));
-})
+    .json(new ApiResponse(200, updatedPlaylist, "Video added to playlist successfully"));
+});
 
 const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
     const {playlistId, videoId} = req.params
     // TODO: remove video from playlist
 
+    if(!playlistId){
+        throw new ApiError(400, "Playlist id is required")
+    }
+
+    if (!videoId) {
+        throw new ApiError(400, "Video id is required")
+    }
+
+    await Playlist.updateMany(
+        { _id: new mongoose.Types.ObjectId(playlistId) },
+        {
+            $pull: {
+                videos: new mongoose.Types.ObjectId(videoId),
+                videoDetails: new mongoose.Types.ObjectId(videoId)
+
+            }
+        }
+    );
+    return res
+    .status(200)
+    .json(200, {}, "Video Removed Succesfully" )
 })
+
+
 
 const deletePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
