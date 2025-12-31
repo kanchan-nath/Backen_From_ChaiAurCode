@@ -68,6 +68,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
         duration,
         views: 56,
         isPublished: true,
+        owner: req.user._id
     })
 
     return res
@@ -75,6 +76,50 @@ const publishAVideo = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, { videoDetails, videoPublicId, thumbnailPublicId }, "Video Uploaded Successfully")) 
     // 694f99b0ba060cfbe56f45f6
     
+})
+
+const getOwnerDetailsFromVideo = asyncHandler(async(req,res) =>{
+    const {videoId} = req.params 
+    const ownerFromVideos = await Video.aggregate([
+        {
+            $match:{
+                _id: new mongoose.Types.ObjectId(videoId) 
+            }
+        },
+        {
+            $lookup:{
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner"
+            }
+        },
+        {
+            $unwind: "$owner"
+        },
+        {
+            $project:{
+                _id: 1,
+                videoFile:1,
+                thumbnail:1,
+                title:1,
+                description:1,
+                duration:1,
+                views:1,
+                owner:{
+                    username:1,
+                    email:1,
+                    fullName:1,
+                    avatar:1,
+                    coverImage:1,
+                }
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, ownerFromVideos, "Fetched"))
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -167,5 +212,6 @@ export {
     getVideoById,
     updateVideo,
     deleteVideo,
-    togglePublishStatus
+    togglePublishStatus,
+    getOwnerDetailsFromVideo
 }
